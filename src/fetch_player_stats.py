@@ -2,6 +2,7 @@ import requests
 from bs4 import BeautifulSoup
 import pandas as pd
 import time
+import os
 
 # Function to get the HTML of a page
 def get_html(url):
@@ -40,7 +41,7 @@ def extract_player_stats(player_url):
             if cols:  # Only add non-empty rows
                 player_data.append(cols)
     
-    return player_data, headers
+    return player_data
 
 # Main function to scrape player stats across matches and save as CSV
 def scrape_player_game_logs(player_urls, output_file='player_stats.csv'):
@@ -49,21 +50,28 @@ def scrape_player_game_logs(player_urls, output_file='player_stats.csv'):
     # Loop over player URLs to collect data
     for player_url in player_urls:
         print(f"Scraping data from: {player_url}")
-        player_stats, headers = extract_player_stats(player_url)
+        player_stats = extract_player_stats(player_url)
         all_player_data.extend(player_stats)
         
         # Pause between requests to avoid overwhelming the server
-        time.sleep(0.5)
+        time.sleep(2)
     
     # Convert to a DataFrame and save to CSV
     if all_player_data:
-        df = pd.DataFrame(all_player_data, columns=[
-            'GameNumber', 'Date', 'Age', 'Team', 'Home/Away', 'Opponent', 'Result', 'GS', 'MP', 'FG', 'FGA', 'FG%', 
-            '3P', '3PA', '3P%', 'FT', 'FTA', 'FT%', 'ORB', 'DRB', 'TRB', 'AST', 'STL', 
-            'BLK', 'TOV', 'PF', 'PTS', 'GmSc', '+/-'
-        ])
-        df.to_csv(output_file, index=False)
-        print(f"Data saved to {output_file}")
+        try:
+            df = pd.DataFrame(all_player_data, columns=[
+                'GameNumber', 'Date', 'Age', 'Team', 'Home/Away', 'Opponent', 'Result', 'GS', 'MP', 'FG', 'FGA', 'FG%', 
+                '3P', '3PA', '3P%', 'FT', 'FTA', 'FT%', 'ORB', 'DRB', 'TRB', 'AST', 'STL', 
+                'BLK', 'TOV', 'PF', 'PTS', 'GmSc', '+/-'
+            ])
+            df.to_csv(output_file, index=False)
+            print(f"Data saved to {output_file}")
+        except AssertionError as e:
+            print(e)
+            print("Bad Data")
+        except ValueError as e:
+            print(e)
+            print("Bad Data")
     else:
         print("No data found")
 
@@ -74,10 +82,10 @@ player_urls = [
 ]
 player_urls = open('data/player_urls.txt', 'r').read().split('\n')
 
-urls_to_log = []
 for player in player_urls:
     for stat_year in ['2023','2024']:
         url = player.replace('.html', f'/gamelog/{stat_year}')
-        urls_to_log.append(url)
-
-scrape_player_game_logs(urls_to_log, 'data/player_stats.csv')
+        fn = url.split('.com')[1].replace('/', '_')
+        if os.path.exists(f'data/players/{fn}.csv'):
+            continue
+        scrape_player_game_logs([url], f'data/players/{fn}.csv')
